@@ -1,4 +1,4 @@
-flask==2.0.0
+flask==2.3.1
 openai==0.27.7
 twilio==8.4.0
 pyngrok==6.0.0
@@ -12,3 +12,12 @@ langchainplus-sdk==0.0.20
 langchain==0.0.230   
 jinja2==2.11.3
 MarkupSafe==1.1.1
+
+streamlit
+streamlit_chat
+langchain
+openai
+faiss-cpu
+tiktoken
+
+                             

@@ -12,6 +12,22 @@ from langchain.chains.conversation.memory import ConversationBufferMemory
 # Initialize the OpenAI API key
 openai.api_key=os.getenv('OPENAI_KEY')
 
+LUPUS_KEYWORDS = [
+    "pain", "fatigue", "rash", "swelling", "medication", "flare-up", "doctor", "treatment", "joint ache", "fever", 
+    "sun sensitivity", "weight change", "hair loss", "sleep", "headache", "stress", "diet", "mood swings", "depression", 
+    "anxiety", "specialist", "hospital", "therapy", "blood test", "appointment", "symptoms", "family history", "bruising", 
+    "kidney issues", "breathing problems", "chest pain", "allergies", "supplements", "memory loss", "diet", "exercise", "sunburn", 
+    "dry eyes", "dizziness", "nausea", "labs", "sensitivity", "referral", "immune system", "wellness", "pregnancy", "fatigue", 
+    "swelling", "heartbeat", "blood pressure", "infection", "dietitian", "sunscreen", "ointment", "rest", "flare triggers", 
+    "mobility", "skin", "inflammation", "counseling", "bones", "joints", "calcium", "chronic", "vaccine", "arthritis", 
+    "lupus", "side effects", "vitamins", "minerals", "disability", "insurance", "diet", "hydration", "help", "choroiditis", "creatinine",
+    "kidney", "assist", "role"
+]
+
+def is_medical_related(query):
+    query = query.lower()  # Convert the query to lowercase for easy comparison
+    return any(keyword in query for keyword in LUPUS_KEYWORDS)
+
 # Initialization
 llm = ChatOpenAI(
     temperature=0,
@@ -24,8 +40,10 @@ conversation_buf = ConversationChain(
     memory=ConversationBufferMemory()
 )
 
-assistant_prompt = """
-You are Sofia's dedicated AI medical advisor. Your primary role is to provide insightful and tailored medical advice, considering Sofia's unique health circumstances. Always rely on the following foundational data about Sofia, unless she updates you with new information:
+# Flask Application
+app = Flask(__name__)
+
+assistant_prompt = """ You are Sofia's dedicated AI medical advisor. Your primary role is to provide insightful and tailored medical advice, considering Sofia's unique health circumstances. Always rely on the following foundational data about Sofia, unless she updates you with new information:
 
 - **Age**: 26 years old.
 - **Diagnosed Conditions**: Lupus (diagnosed 4 years ago), Raynaud syndrome, Uveitis.
@@ -36,7 +54,14 @@ You are Sofia's dedicated AI medical advisor. Your primary role is to provide in
 - **Primary Goals**: Manage and control symptoms.
 - **Other Pertinent Details**: [None at this moment].
 
-Based on the above, when Sofia seeks advice, present your recommendations in the following structured manner:
+Based on the above, when Sofia seeks advice or poses questions related to documents, use the following structure:
+
+Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer. Use three sentences maximum. Keep the answer as concise as possible. 
+{context}
+Question: {question}
+Helpful Answer:
+
+When providing medical advice, present your recommendations in this structured manner:
 
 1. **General Recommendations**: Offer broad advice pertinent to Sofia's conditions.
 2. **Symptom Management**: Discuss possible strategies or treatments to mitigate her symptoms.
@@ -46,28 +71,21 @@ Based on the above, when Sofia seeks advice, present your recommendations in the
 6. **Mental Well-being**: Advocate techniques or habits beneficial for emotional and mental health, like relaxation methods or stress coping mechanisms.
 7. **Prevention & Alerts**: Highlight any warning signs or symptoms that necessitate immediate medical intervention.
 
-At the conclusion, offer Sofia a succinct summary encapsulating all your advice.
+At the conclusion, offer Sofia a succinct summary encapsulating all your advice and always say "thanks for asking, Sofia!" at the end of the answer.
 """
-
-
-# Start the conversation with the assistant's prompt
-conversation_buf.run(assistant_prompt)
 
 def get_completion(user_prompt):
     """
     This function now leverages conversation_buf for memory.
     """
     # Use the conversation_buf's run method and extract the response
-    response = conversation_buf(user_prompt)['response']
+    response = conversation_buf.run(user_prompt)['response']  
     return response
-
-# Flask Application
-app = Flask(__name__)
 
 def send_whatsapp_message(to, body):
     # Your Account SID and Auth Token
     account_sid = 'AC6c8db67434d8f5c87143e539f145d138'
-    auth_token  = 'a77533f98fa86b7be5ade5d2fe88dd4e'
+    auth_token  = '05b63cea93916cd3aaa271c1416486b3'
 
     client = Client(account_sid, auth_token)
     
@@ -95,14 +113,20 @@ def async_generate_answer(question, to):
 
 @app.route('/chatgpt', methods=['POST'])
 def chatgpt():
-    incoming_que = request.values.get('Body', '')
+    incoming_que = request.values.get('Body', '').strip()
     to = request.values.get('From', '')[9:]
 
     bot_resp = MessagingResponse()
     msg = bot_resp.message()
-    msg.body("Answering...")
-    print("Question: ", incoming_que)
-    Thread(target=async_generate_answer, args=(incoming_que, to)).start()
+    
+    # Check if the query is related to lupus or general medical topics
+    if is_medical_related(incoming_que):
+        msg.body("Answering...")
+        print("Question: ", incoming_que)
+        Thread(target=async_generate_answer, args=(incoming_que, to)).start()
+    else:
+        msg.body("Sorry, I can only answer questions related to lupus and medical topics. Please ask a relevant question.")
+    
     return str(bot_resp)
 
 if __name__ == '__main__':

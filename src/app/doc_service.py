@@ -1,3 +1,6 @@
+## By Sofia De la Mora Tostado
+# 2023
+
 import openai
 import time
 import os
